@@ -18,20 +18,17 @@ def analyze_data():
 
     print("Calculando alertas...")
 
-    data = Data.objects.filter(
-        base_time__gte=datetime.now() - timedelta(hours=1))
-    aggregation = data.annotate(check_value=Avg('avg_value')) \
-        .select_related('station', 'measurement') \
-        .select_related('station__user', 'station__location') \
-        .select_related('station__location__city', 'station__location__state',
-                        'station__location__country') \
-        .values('check_value', 'station__user__username',
-                'measurement__name',
-                'measurement__max_value',
-                'measurement__min_value',
-                'station__location__city__name',
-                'station__location__state__name',
-                'station__location__country__name')
+    aggregation = Data.objects.filter(
+        base_time__gte=datetime.now() - timedelta(hours=1)
+    ).values(
+        'station__user__username',
+        'station__location__city__name',
+        'station__location__state__name',
+        'station__location__country__name',
+        'measurement__name',
+        'measurement__max_value',
+        'measurement__min_value',
+    ).annotate(check_value=Avg('avg_value'))
     alerts = 0
     for item in aggregation:
         alert = False

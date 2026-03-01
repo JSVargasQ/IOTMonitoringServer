@@ -100,9 +100,16 @@ def get_or_create_station(user, location):
 def get_or_create_measurement(name, unit):
     '''
     Intenta traer la variable con nombre y unidad {name, unit}. Si no existe la crea y la retorna.
+    Para temperatura y humedad se definen límites por defecto para las alertas del servicio de control.
     '''
+    defaults = {}
+    name_lower = name.lower() if name else ''
+    if name_lower == 'temperatura':
+        defaults = {'min_value': 5.0, 'max_value': 35.0}
+    elif name_lower == 'humedad':
+        defaults = {'min_value': 0.0, 'max_value': 100.0}
     measurement, created = Measurement.objects.get_or_create(
-        name=name, unit=unit)
+        name=name, unit=unit, defaults=defaults)
     return measurement
 
 
