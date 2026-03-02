@@ -12,14 +12,14 @@ client = mqtt.Client(settings.MQTT_USER_PUB)
 
 
 def analyze_data():
-    # Consulta todos los datos de la última hora, los agrupa por estación y variable
+    # Consulta todos los datos del último minuto, los agrupa por estación y variable
     # Compara el promedio con los valores límite que están en la base de datos para esa variable.
     # Si el promedio se excede de los límites, se envia un mensaje de alerta.
 
     print("Calculando alertas...")
 
     aggregation = Data.objects.filter(
-        base_time__gte=datetime.now() - timedelta(hours=1)
+        base_time__gte=datetime.now() - timedelta(minutes=1)
     ).values(
         'station__user__username',
         'station__location__city__name',
@@ -29,25 +29,33 @@ def analyze_data():
         'measurement__max_value',
         'measurement__min_value',
     ).annotate(check_value=Avg('avg_value'))
+    SUPER_OFFSET = 2  # puntos por encima del máximo para alerta super máxima
     alerts = 0
     for item in aggregation:
-        alert = False
-
         variable = item["measurement__name"]
         max_value = item["measurement__max_value"] or 0
         min_value = item["measurement__min_value"] or 0
+        check_value = item["check_value"]
 
         country = item['station__location__country__name']
         state = item['station__location__state__name']
         city = item['station__location__city__name']
         user = item['station__user__username']
+        topic = '{}/{}/{}/{}/in'.format(country, state, city, user)
 
-        if item["check_value"] > max_value or item["check_value"] < min_value:
-            alert = True
-
-        if alert:
+        if check_value > max_value + SUPER_OFFSET:
+            if variable.lower() == 'temperatura':
+                message = "ALERT {} {} {}".format(variable, min_value, max_value)
+                print(datetime.now(), "Sending alert to {} {}".format(topic, variable))
+                client.publish(topic, message)
+                alerts += 1
+            message = "ALERT_SUPER {} {} {} (>{})".format(
+                variable, min_value, max_value, max_value + SUPER_OFFSET)
+            print(datetime.now(), "Sending super alert to {} {}".format(topic, variable))
+            client.publish(topic, message)
+            alerts += 1
+        elif check_value > max_value or check_value < min_value:
             message = "ALERT {} {} {}".format(variable, min_value, max_value)
-            topic = '{}/{}/{}/{}/in'.format(country, state, city, user)
             print(datetime.now(), "Sending alert to {} {}".format(topic, variable))
             client.publish(topic, message)
             alerts += 1
@@ -99,10 +107,10 @@ def setup_mqtt():
 
 def start_cron():
     '''
-    Inicia el cron que se encarga de ejecutar la función analyze_data cada 5 minutos.
+    Inicia el cron que se encarga de ejecutar la función analyze_data cada 1 minuto.
     '''
     print("Iniciando cron...")
-    schedule.every(5).minutes.do(analyze_data)
+    schedule.every(1).minutes.do(analyze_data)
     print("Servicio de control iniciado")
     while 1:
         schedule.run_pending()
