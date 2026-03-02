@@ -13,6 +13,7 @@ def get_measurements():
 
 def get_last_week_data(user, city, state, country):
     result = {}
+    measurementsO = get_measurements()
     start = datetime.now()
     start = start - dateutil.relativedelta.relativedelta(days=1)
     try:
@@ -25,17 +26,16 @@ def get_last_week_data(user, city, state, country):
             location = Location.objects.get(
                 city=cityO, state=stateO, country=countryO
             )
-        except:
+        except Exception:
             print("Specified location does not exist")
         print("LAST_WEEK: Got user and lcoation:",
               user, city, state, country)
-        if userO == None or location == None:
-            raise "No existe el usuario o ubicación indicada"
+        if userO is None or location is None:
+            return result, measurementsO
         stationO = Station.objects.get(user=userO, location=location)
         print("LAST_WEEK: Got station:", user, location, stationO)
-        if stationO == None:
-            raise "No hay datos para esa ubicación"
-        measurementsO = get_measurements()
+        if stationO is None:
+            return result, measurementsO
         print("LAST_WEEK: Measurements got: ", measurementsO)
         for measure in measurementsO:
             print("LAST_WEEK: Filtering measure: ", measure)
@@ -61,13 +61,12 @@ def get_last_week_data(user, city, state, country):
 
             minVal = raw_data.aggregate(Min("min_value"))["min_value__min"]
             maxVal = raw_data.aggregate(Max("max_value"))["max_value__max"]
-            avgVal = sum(reg.avg_value * reg.length for reg in raw_data) / sum(
-                reg.length for reg in raw_data
-            )
+            total_len = sum(reg.length for reg in raw_data)
+            avgVal = (sum(reg.avg_value * reg.length for reg in raw_data) / total_len) if total_len else 0
             result[measure.name] = {
-                "min": minVal if minVal != None else 0,
-                "max": maxVal if maxVal != None else 0,
-                "avg": round(avgVal if avgVal != None else 0, 2),
+                "min": minVal if minVal is not None else 0,
+                "max": maxVal if maxVal is not None else 0,
+                "avg": round(avgVal if avgVal is not None else 0, 2),
                 "data": data,
             }
     except Exception as error:
