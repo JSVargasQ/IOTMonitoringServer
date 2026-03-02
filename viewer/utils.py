@@ -11,6 +11,10 @@ def get_measurements():
     return list(measurements)
 
 
+# Máximo de puntos por variable en tiempo real para no saturar el frontend (payload + Highcharts)
+MAX_POINTS_REALTIME = 250
+
+
 def get_last_week_data(user, city, state, country):
     result = {}
     measurementsO = get_measurements()
@@ -27,29 +31,21 @@ def get_last_week_data(user, city, state, country):
                 city=cityO, state=stateO, country=countryO
             )
         except Exception:
-            print("Specified location does not exist")
-        print("LAST_WEEK: Got user and lcoation:",
-              user, city, state, country)
+            pass
         if userO is None or location is None:
             return result, measurementsO
         stationO = Station.objects.get(user=userO, location=location)
-        print("LAST_WEEK: Got station:", user, location, stationO)
         if stationO is None:
             return result, measurementsO
-        print("LAST_WEEK: Measurements got: ", measurementsO)
         for measure in measurementsO:
-            print("LAST_WEEK: Filtering measure: ", measure)
-            # time__gte=start.date() Filtro para último día
             start_ts = int(start.timestamp() * 1000000)
             raw_data = Data.objects.filter(
                 station=stationO, time__gte=start_ts, measurement=measure
             ).order_by("-base_time")[:2]
-            print("LAST_WEEK: Raw data: ", len(raw_data))
             data = []
             for reg in raw_data:
                 values = reg.values
                 times = reg.times
-                print("Len vals: ", len(values), "Len times: ", len(times))
                 for i in range(len(values)):
                     data.append(
                         (
@@ -58,7 +54,7 @@ def get_last_week_data(user, city, state, country):
                             values[i],
                         )
                     )
-
+            data = data[-MAX_POINTS_REALTIME:]
             minVal = raw_data.aggregate(Min("min_value"))["min_value__min"]
             maxVal = raw_data.aggregate(Max("max_value"))["max_value__max"]
             total_len = sum(reg.length for reg in raw_data)
