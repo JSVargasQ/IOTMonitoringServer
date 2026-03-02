@@ -15,11 +15,14 @@ def analyze_data():
     # Consulta todos los datos del último minuto, los agrupa por estación y variable
     # Compara el promedio con los valores límite que están en la base de datos para esa variable.
     # Si el promedio se excede de los límites, se envia un mensaje de alerta.
+    # Nota: Data usa 'time' (microsegundos) para el instante; base_time tiene solo precisión por hora.
 
     print("Calculando alertas...")
+    now_ts = int(datetime.now().timestamp() * 1_000_000)
+    one_minute_ago_ts = now_ts - (60 * 1_000_000)
 
     aggregation = Data.objects.filter(
-        base_time__gte=datetime.now() - timedelta(minutes=1)
+        time__gte=one_minute_ago_ts
     ).values(
         'station__user__username',
         'station__location__city__name',
