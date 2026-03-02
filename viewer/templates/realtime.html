@@ -346,12 +346,8 @@
         ],
       });
         });
-    var qtySamePeriodsByKey = {};
-
-    var pollCount = 0;
     setInterval(async () => {
       try {
-        pollCount++;
         var payload = {
           city: "{{selectedCity.name}}",
           state: "{{selectedState.name}}",
@@ -369,54 +365,25 @@
           credentials: 'same-origin'
         });
         var contentType = res.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          console.warn('Poll #' + pollCount + ': respuesta no es JSON', res.status, await res.text().then(function(t){ return t.slice(0,200); }));
-          return;
-        }
+        if (!contentType.includes('application/json')) return;
         var resp = await res.json();
-        if (resp.error) {
-          console.warn('Poll #' + pollCount + ' error:', resp.error);
-          return;
-        }
-        if (!resp.result || typeof resp.result !== 'object') {
-          return;
-        }
+        if (resp.error || !resp.result || typeof resp.result !== 'object') return;
         var newResult = resp.result;
         var keys = Object.keys(newResult);
-        if (keys.length === 0) {
-          return;
-        }
+        if (keys.length === 0) return;
         for (var i = 0; i < keys.length; i++) {
           var key = keys[i];
           var element = newResult[key];
           if (!element || !element.hasOwnProperty('data')) continue;
           var seriesData = Array.isArray(element.data) ? element.data : [];
-          var hasNewPoints = seriesData.length > 0;
-          var prev = data[key];
-          var hadPoints = prev && Array.isArray(prev.data) && prev.data.length > 0;
-          if (!qtySamePeriodsByKey[key]) qtySamePeriodsByKey[key] = 0;
-          if (!hasNewPoints) {
-            qtySamePeriodsByKey[key]++;
-          } else if (hadPoints && seriesData[seriesData.length - 1][0] === prev.data[prev.data.length - 1][0]) {
-            qtySamePeriodsByKey[key]++;
-          } else {
-            qtySamePeriodsByKey[key] = 0;
-          }
-          var showBlocker = qtySamePeriodsByKey[key] > 2;
           var blockerElement = document.getElementById('blocker-' + key);
-          if (blockerElement) blockerElement.style.display = showBlocker ? 'flex' : 'none';
+          if (blockerElement) blockerElement.style.display = 'none';
           var minEl = document.getElementById('min-' + key);
           var maxEl = document.getElementById('max-' + key);
           var avgEl = document.getElementById('avg-' + key);
-          if (showBlocker) {
-            if (minEl) minEl.innerText = '-';
-            if (maxEl) maxEl.innerText = '-';
-            if (avgEl) avgEl.innerText = '-';
-          } else {
-            if (minEl) minEl.innerText = element.min != null ? element.min : '-';
-            if (maxEl) maxEl.innerText = element.max != null ? element.max : '-';
-            if (avgEl) avgEl.innerText = element.avg != null ? element.avg : '-';
-          }
+          if (minEl) minEl.innerText = element.min != null ? element.min : '-';
+          if (maxEl) maxEl.innerText = element.max != null ? element.max : '-';
+          if (avgEl) avgEl.innerText = element.avg != null ? element.avg : '-';
           if (charts[key]) {
             charts[key].update({
               series: [{ type: "line", name: "Valor", data: seriesData }]
@@ -425,7 +392,7 @@
         }
         data = newResult;
       } catch (err) {
-        console.error('Error en polling tiempo real (#' + pollCount + '):', err);
+        console.error('Error en polling tiempo real:', err);
       }
     }, 3000);
 </script>
