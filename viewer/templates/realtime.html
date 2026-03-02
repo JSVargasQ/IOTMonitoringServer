@@ -346,7 +346,7 @@
         ],
       });
         });
-    let qtySamePeriods = 0;
+    var qtySamePeriodsByKey = {};
 
     var pollCount = 0;
     setInterval(async () => {
@@ -394,23 +394,25 @@
           var hasNewPoints = seriesData.length > 0;
           var prev = data[key];
           var hadPoints = prev && Array.isArray(prev.data) && prev.data.length > 0;
+          if (!qtySamePeriodsByKey[key]) qtySamePeriodsByKey[key] = 0;
           if (!hasNewPoints) {
-            qtySamePeriods++;
+            qtySamePeriodsByKey[key]++;
           } else if (hadPoints && seriesData[seriesData.length - 1][0] === prev.data[prev.data.length - 1][0]) {
-            qtySamePeriods++;
+            qtySamePeriodsByKey[key]++;
           } else {
-            qtySamePeriods = 0;
+            qtySamePeriodsByKey[key] = 0;
           }
+          var showBlocker = qtySamePeriodsByKey[key] > 2;
           var blockerElement = document.getElementById('blocker-' + key);
-          var stats = document.getElementsByClassName('stat');
-          if (qtySamePeriods > 2) {
-            if (blockerElement) blockerElement.style.display = 'flex';
-            [].forEach.call(stats, function(stat) { stat.innerHTML = "-"; });
+          if (blockerElement) blockerElement.style.display = showBlocker ? 'flex' : 'none';
+          var minEl = document.getElementById('min-' + key);
+          var maxEl = document.getElementById('max-' + key);
+          var avgEl = document.getElementById('avg-' + key);
+          if (showBlocker) {
+            if (minEl) minEl.innerText = '-';
+            if (maxEl) maxEl.innerText = '-';
+            if (avgEl) avgEl.innerText = '-';
           } else {
-            if (blockerElement) blockerElement.style.display = 'none';
-            var minEl = document.getElementById('min-' + key);
-            var maxEl = document.getElementById('max-' + key);
-            var avgEl = document.getElementById('avg-' + key);
             if (minEl) minEl.innerText = element.min != null ? element.min : '-';
             if (maxEl) maxEl.innerText = element.max != null ? element.max : '-';
             if (avgEl) avgEl.innerText = element.avg != null ? element.avg : '-';
