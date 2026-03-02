@@ -1,7 +1,7 @@
-from argparse import ArgumentError
 import ssl
 from django.db.models import Avg
 from datetime import timedelta, datetime
+from django.utils import timezone
 from receiver.models import Data, Measurement
 import paho.mqtt.client as mqtt
 import schedule
@@ -12,18 +12,16 @@ client = mqtt.Client(settings.MQTT_USER_PUB)
 
 
 def analyze_data():
-    # Consulta todos los datos del último minuto, los agrupa por estación y variable
-    # Compara el promedio con los valores límite que están en la base de datos para esa variable.
-    # Si el promedio se excede de los límites, se envia un mensaje de alerta.
-    # Nota: Data usa 'time' (microsegundos) para el instante; base_time tiene solo precisión por hora.
+    # Consulta datos recientes, los agrupa por estación y variable y compara con límites.
+    # En el modelo Data, 'time' y 'base_time' tienen precisión por HORA (se truncan en create_data).
+    # Por eso filtramos por base_time en las últimas 2 horas para tener datos recientes.
 
     print("Calculando alertas...")
-    now_ts = int(datetime.now().timestamp() * 1_000_000)
-    one_minute_ago_ts = now_ts - (60 * 1_000_000)
+    now = timezone.now()
+    window_start = (now - timedelta(hours=2)).replace(minute=0, second=0, microsecond=0)
 
-    aggregation = Data.objects.filter(
-        time__gte=one_minute_ago_ts
-    ).values(
+    raw = Data.objects.filter(base_time__gte=window_start)
+    aggregation = raw.values(
         'station__user__username',
         'station__location__city__name',
         'station__location__state__name',
@@ -32,6 +30,7 @@ def analyze_data():
         'measurement__max_value',
         'measurement__min_value',
     ).annotate(check_value=Avg('avg_value'))
+    print("Datos en ventana (últimas 2 h):", raw.count(), "| Grupos (estación+variable):", len(aggregation))
     SUPER_OFFSET = 2  # puntos por encima del máximo para alerta super máxima
     alerts = 0
     for item in aggregation:
